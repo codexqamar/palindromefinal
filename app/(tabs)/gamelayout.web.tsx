@@ -637,7 +637,7 @@ export default function GameLayoutWeb() {
     },
     {
       title: "Score",
-      description: "Your score increases when you create palindromes. Longer lines score higher.",
+      description: "Your score increases when you create odd-length palindromes with at least two colors.",
       targetId: "tour-game-status-score",
       mode: "modal",
       showBack: true,
@@ -665,7 +665,7 @@ export default function GameLayoutWeb() {
     },
     {
       title: "Game Board",
-      description: "Place blocks to form palindromes in a row or column (3+ blocks).",
+      description: "Place blocks to form multi-color palindromes in a row or column. Only 3, 5, 7, ... count.",
       targetId: "tour-game-board",
       mode: "modal",
       showBack: true,
@@ -1375,7 +1375,7 @@ export default function GameLayoutWeb() {
         : tutorialPhase === "makeScore"
           ? {
               title: "Make Your First Score",
-              description: "Keep placing blocks until you create a palindrome (3+ in a row or column).",
+              description: "Keep placing blocks until you create a multi-color odd palindrome in a row or column.",
               targetId: "tour-game-board",
               mode: "coach",
               showPrimary: false,
@@ -2152,7 +2152,7 @@ export default function GameLayoutWeb() {
                       }}>
                         <div style={{ fontSize: 14, fontFamily: "Geist-Bold, system-ui", color: colors.text, marginBottom: 6 }}>Palindrome</div>
                         <div style={{ fontSize: 13, fontFamily: "Geist-Regular, system-ui", color: colors.text, opacity: 0.82, lineHeight: "18px" }}>
-                          A sequence that reads the same forwards and backwards. Only odd lengths count (3, 5, 7, ...).
+                          A sequence that reads the same forwards and backwards. Only odd lengths count (3, 5, 7, ...), and all-one-color lines do not score.
                         </div>
                       </div>
 
@@ -2164,7 +2164,7 @@ export default function GameLayoutWeb() {
                       }}>
                         <div style={{ fontSize: 14, fontFamily: "Geist-Bold, system-ui", color: colors.text, marginBottom: 6 }}>Valid Move</div>
                         <div style={{ fontSize: 13, fontFamily: "Geist-Regular, system-ui", color: colors.text, opacity: 0.82, lineHeight: "18px" }}>
-                          Your placement must create a palindrome in a row, column, or a single 90° right-angle (L-shape).
+                          Your placement must create a multi-color odd palindrome in a row, column, or a single 90° right-angle (L-shape).
                         </div>
                       </div>
 
@@ -2176,7 +2176,7 @@ export default function GameLayoutWeb() {
                       }}>
                         <div style={{ fontSize: 14, fontFamily: "Geist-Bold, system-ui", color: colors.text, marginBottom: 6 }}>First Move</div>
                         <div style={{ fontSize: 13, fontFamily: "Geist-Regular, system-ui", color: colors.text, opacity: 0.82, lineHeight: "18px" }}>
-                          At the start you place two blocks. After the second placement you must have created a 5+ palindrome.
+                          At the start you place two blocks. After the second placement you must have created a multi-color 5+ odd palindrome.
                         </div>
                       </div>
                     </div>

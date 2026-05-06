@@ -133,9 +133,8 @@ export function createInitialState(seed: string): GameState {
   const blocked = getBlockedPositionsForBulldogs();
   const bulldogPositions = createBulldogPositions(rng, blocked);
 
-  // Pick 2-3 colors for the starting horizontal palindrome setup
-  // 50% chance: 3 different colors (player needs 2 blocks to make 5-counter)
-  // 50% chance: 2 colors with one repeated (player can make 4-counter with 1 block)
+  // Pick 2-3 colors for the starting horizontal palindrome setup.
+  // Scoring palindromes must be odd-length and use at least two colors.
   const useThreeColors = rng() < 0.5;
   const availableColors = shuffleColors(rng);
   
@@ -187,6 +186,7 @@ export function checkPalindromes(
 ): ScoringResult {
   const isOdd = (n: number) => n % 2 === 1;
   const isInside = (r: number, c: number) => r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE;
+  const hasMultipleColors = (segment: ScoredTile[]) => new Set(segment.map((tile) => tile.color)).size > 1;
 
   const checkLine = (lineIsRow: boolean): { length: number; segment: ScoredTile[] | null } => {
     const line: ScoredTile[] = [];
@@ -222,7 +222,7 @@ export function checkPalindromes(
         const sub = segment.slice(s, e + 1);
         const colors = sub.map(c => c.color);
         const isPal = colors.join(',') === [...colors].reverse().join(',');
-        if (isPal) {
+        if (isPal && hasMultipleColors(sub)) {
           bestLength = len;
           bestSegment = sub;
         }
@@ -294,6 +294,7 @@ export function checkPalindromes(
           const cB = cornerCol + pair.b.dc * dist;
           tiles.push({ color: grid[rB][cB] as number, r: rB, c: cB });
         }
+        if (!hasMultipleColors(tiles)) continue;
         bestLen = length;
         bestSegment = tiles;
       }
@@ -312,6 +313,7 @@ export function checkPalindromes(
 
   const scoreFor = (length: number, segment: ScoredTile[] | null) => {
     if (!segment || length < minLength) return { score: 0, hasBulldog: false };
+    if (!isOdd(length) || !hasMultipleColors(segment)) return { score: 0, hasBulldog: false };
     const hasBulldog = segment.some((b) =>
       bulldogPositions.some((bp) => bp.row === b.r && bp.col === b.c)
     );
