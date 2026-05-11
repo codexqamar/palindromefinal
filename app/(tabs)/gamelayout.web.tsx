@@ -1324,6 +1324,39 @@ export default function GameLayoutWeb() {
     minLength = 3,
     previousGrid?: (number | null)[][]
   ): ScoringEvent[] => {
+    const anchorKeys = new Set(anchors.map(({ row, col }) => `${row},${col}`))
+    const orderSegmentFromAnchor = (event: ScoringEvent): ScoringEvent => {
+      const anchorIndex = event.segment.findIndex((tile) => anchorKeys.has(`${tile.r},${tile.c}`))
+      if (anchorIndex < 0) return event
+
+      const ordered: NonNullable<ScoringResult["segment"]> = []
+      const seen = new Set<string>()
+      for (let distance = 0; distance < event.segment.length; distance++) {
+        const left = anchorIndex - distance
+        const right = anchorIndex + distance
+
+        if (left >= 0) {
+          const tile = event.segment[left]
+          const key = `${tile.r},${tile.c}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            ordered.push(tile)
+          }
+        }
+
+        if (right < event.segment.length) {
+          const tile = event.segment[right]
+          const key = `${tile.r},${tile.c}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            ordered.push(tile)
+          }
+        }
+      }
+
+      return { ...event, segment: ordered }
+    }
+
     const collectEvents = (scanGrid: (number | null)[][]) => {
       const eventsByKey = new Map<string, ScoringEvent>()
       const scanAnchors = previousGrid
@@ -1357,10 +1390,12 @@ export default function GameLayoutWeb() {
       })
     }
 
-    return [...eventsByKey.values()].sort((a, b) => {
-      if (b.segmentLength !== a.segmentLength) return b.segmentLength - a.segmentLength
-      return b.score - a.score
-    })
+    return [...eventsByKey.values()]
+      .sort((a, b) => {
+        if (b.segmentLength !== a.segmentLength) return b.segmentLength - a.segmentLength
+        return b.score - a.score
+      })
+      .map(orderSegmentFromAnchor)
   }
 
   const checkAndProcessPalindromes = (
