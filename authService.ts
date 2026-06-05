@@ -64,9 +64,32 @@ class AuthService {
     if (Platform.OS !== 'web') {
       GoogleSignin.configure({
         webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+        scopes: ['profile', 'email'],
         offlineAccess: true,
       });
     }
+  }
+
+  private async signInWithNativeOAuth(provider: 'google' | 'apple'): Promise<AuthResult> {
+    const supabase = getSupabaseClient();
+    const redirectTo = Linking.createURL('auth/callback');
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+        ...(provider === 'apple' ? { scopes: 'name email' } : {}),
+      },
+    });
+
+    if (error) return { success: false, error: error.message, code: (error as any).code };
+    if (!data?.url) return { success: false, error: 'Missing OAuth URL' };
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success' || !result.url) return { success: false, error: 'Sign in canceled' };
+
+    return await this.completeOAuthRedirect(result.url);
   }
 
   async exchangeCodeForSession(code: string): Promise<AuthResult> {
@@ -168,8 +191,14 @@ class AuthService {
             case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
               return { success: false, error: 'Google Play Services not available' };
             default:
+              if (error.code === 'DEVELOPER_ERROR') {
+                return await this.signInWithNativeOAuth('google');
+              }
               return { success: false, error: error.message || 'Google sign-in failed' };
           }
+        }
+        if (error?.code === 'DEVELOPER_ERROR' || error?.message?.includes('DEVELOPER_ERROR')) {
+          return await this.signInWithNativeOAuth('google');
         }
         return { success: false, error: error?.message || 'Google sign-in failed' };
       }
@@ -250,24 +279,7 @@ class AuthService {
       }
 
       // For Android (or other native platforms), use standard OAuth flow
-      const redirectTo = Linking.createURL('auth/callback');
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: { 
-          redirectTo, 
-          skipBrowserRedirect: true,
-          scopes: 'name email'
-        },
-      });
-
-      if (error) return { success: false, error: error.message, code: (error as any).code };
-      if (!data?.url) return { success: false, error: 'Missing OAuth URL' };
-
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      if (result.type !== 'success' || !result.url) return { success: false, error: 'Sign in canceled' };
-
-      return await this.completeOAuthRedirect(result.url);
+      return await this.signInWithNativeOAuth('apple');
     } catch (e: any) {
       return { success: false, error: e?.message || 'Failed to sign in with Apple' };
     }

@@ -7,7 +7,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Animated,
-    Dimensions,
     GestureResponderEvent,
     Image,
     PanResponder,
@@ -504,7 +503,14 @@ function VideoGuideOverlay(props: {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      videoRefs.current.forEach((v) => {
+        if (!v) return
+        v.pauseAsync().catch(() => {})
+        v.setPositionAsync(0).catch(() => {})
+      })
+      return
+    }
     videoRefs.current.forEach((v, i) => {
       if (!v) return
       if (i === slideIndex) {
@@ -778,7 +784,11 @@ export default function GameLayout() {
   }, [colors.accent, theme]);
 
   useEffect(() => {
-    if (matchId) return;
+    if (matchId) {
+      setGuideVisible(false);
+      return;
+    }
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -2506,18 +2516,18 @@ export default function GameLayout() {
         </View>
       )}
     </SafeAreaView>
+      <VideoGuideOverlay
+        open={guideVisible}
+        slideIndex={guideSlideIndex}
+        accentColor={colors.accent}
+        isDark={theme === 'dark'}
+        onBack={backGuide}
+        onNext={nextGuide}
+        onSkip={skipGuide}
+        onDone={doneGuide}
+      />
       </>
     )}
-    <VideoGuideOverlay
-      open={guideVisible}
-      slideIndex={guideSlideIndex}
-      accentColor={colors.accent}
-      isDark={theme === 'dark'}
-      onBack={backGuide}
-      onNext={nextGuide}
-      onSkip={skipGuide}
-      onDone={doneGuide}
-    />
     </GameSpotlightTourProvider>
   );
 }
