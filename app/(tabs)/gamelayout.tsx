@@ -290,6 +290,8 @@ const GUIDE_SLIDES = [
   },
 ];
 
+const GameSpotlightTourProvider = SpotlightTourProvider as React.ComponentType<any>;
+
 function TourCard(props: {
   title: string;
   description: string;
@@ -776,35 +778,29 @@ export default function GameLayout() {
   }, [colors.accent, theme]);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const seen = await AsyncStorage.getItem(GAME_TUTORIAL_SEEN_KEY);
-        if (seen === '1') return;
-        setTimeout(() => tourRef.current?.start?.(), 450);
-      } catch {
-        return;
-      }
-    })();
-  }, []);
+    if (matchId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-  useEffect(() => {
     void (async () => {
       try {
         const guideSeen = await AsyncStorage.getItem(VIDEO_GUIDE_SEEN_KEY);
         if (guideSeen === '1') return;
-        if (matchId) return;
-        const tutorialSeen = await AsyncStorage.getItem(GAME_TUTORIAL_SEEN_KEY);
-        if (tutorialSeen === '1') {
-          setTimeout(() => {
-            setGuideSlideIndex(0);
-            setGuideVisible(true);
-          }, 600);
-        }
+        if (cancelled) return;
+        timer = setTimeout(() => {
+          setGuideSlideIndex(0);
+          setGuideVisible(true);
+        }, 600);
       } catch {
         return;
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [matchId]);
 
   // Game Logic State
   const gridSize = 11;
@@ -1612,7 +1608,7 @@ export default function GameLayout() {
   ));
 
   return (
-    <SpotlightTourProvider
+    <GameSpotlightTourProvider
       ref={tourRef}
       steps={tourSteps}
       overlayColor={'#000000'}
@@ -1622,7 +1618,7 @@ export default function GameLayout() {
       onBackdropPress={() => {}}
       onStop={(_values: TourState) => markTourSeen()}
     >
-    {(tour) => (
+    {(tour: any) => (
       <>
         <GameTourSpotSync
           tour={tour}
@@ -2522,7 +2518,7 @@ export default function GameLayout() {
       onSkip={skipGuide}
       onDone={doneGuide}
     />
-    </SpotlightTourProvider>
+    </GameSpotlightTourProvider>
   );
 }
 
