@@ -23,6 +23,13 @@ export interface AuthResult {
   code?: string;
 }
 
+let passwordResetHandoffActive = false;
+
+export const isPasswordResetHandoffActive = () => passwordResetHandoffActive;
+export const clearPasswordResetHandoff = () => {
+  passwordResetHandoffActive = false;
+};
+
 const toAuthUser = (user: any): AuthUser => {
   const displayName =
     (user?.user_metadata?.displayName as string | undefined) ??
@@ -327,6 +334,7 @@ class AuthService {
 
   async signOut(): Promise<AuthResult> {
     try {
+      clearPasswordResetHandoff();
       const supabase = getSupabaseClient();
       const { error } = await supabase.auth.signOut();
       if (error) return { success: false, error: error.message, code: (error as any).code };
@@ -339,11 +347,59 @@ class AuthService {
   async resetPassword(email: string): Promise<AuthResult> {
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const emailRedirectTo =
+        Platform.OS === 'web'
+          ? `${
+              typeof window !== 'undefined' && window.location.origin
+                ? window.location.origin
+                : 'https://gammagamesbyoxford.com'
+            }/reset-password`
+          : Linking.createURL('reset-password');
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo,
+          shouldCreateUser: false,
+        },
+      });
       if (error) return { success: false, error: error.message, code: (error as any).code };
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Failed to reset password' };
+    }
+  }
+
+  async verifyPasswordResetOtp(email: string, token: string): Promise<AuthResult> {
+    try {
+      passwordResetHandoffActive = true;
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'magiclink',
+      });
+
+      if (error) {
+        clearPasswordResetHandoff();
+        return { success: false, error: error.message, code: (error as any).code };
+      }
+      return { success: true, user: data.user ? toAuthUser(data.user) : null };
+    } catch (e: any) {
+      clearPasswordResetHandoff();
+      return { success: false, error: e?.message || 'Failed to verify reset code' };
+    }
+  }
+
+  async updatePassword(password: string): Promise<AuthResult> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.auth.updateUser({ password });
+
+      if (error) return { success: false, error: error.message, code: (error as any).code };
+      return { success: true, user: data.user ? toAuthUser(data.user) : null };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed to update password' };
     }
   }
 

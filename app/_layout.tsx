@@ -1,3 +1,4 @@
+import { isPasswordResetHandoffActive } from '@/authService';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -90,14 +91,21 @@ export default function RootLayout() {
     const inTabsGroup = segments[0] === '(tabs)';
     const routeName = segments[1] ?? 'index';
     const isAuthScreen = inTabsGroup && (routeName === 'index' || routeName === 'signup');
+    const isResetPasswordRoute = inTabsGroup && routeName === 'reset-password';
     const isLegalRoute = segments[0] === 'privacy' || segments[0] === 'terms';
     const isPublicRoute = isAuthScreen || segments[0] === 'auth' || isLegalRoute;
+    const isPasswordResetHandoff = isPasswordResetHandoffActive();
 
     if (!user && !isPublicRoute) {
       router.replace('/');
-    } else if (user && isAuthScreen) {
+    } else if (user && isAuthScreen && !isPasswordResetHandoff) {
       router.replace('/(tabs)/main');
-    } else if (user && segments[0] !== '(tabs)' && segments[0] !== 'auth') {
+    } else if (
+      user &&
+      segments[0] !== '(tabs)' &&
+      segments[0] !== 'auth' &&
+      !(isPasswordResetHandoff && isResetPasswordRoute)
+    ) {
       router.replace('/(tabs)/main');
     }
   }, [user, segments, authLoading, router]);

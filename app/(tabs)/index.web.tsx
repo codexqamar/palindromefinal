@@ -12,6 +12,11 @@ export default function LoginWeb() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetStep, setResetStep] = useState<'email' | 'otp'>('email');
+  const [resetLoading, setResetLoading] = useState(false);
   const { colors, theme } = useTheme();
 
 
@@ -65,30 +70,64 @@ export default function LoginWeb() {
     }
   };
 
-  // Handle forgot password
-  const handleForgotPassword = async () => {
-    if (!email) {
+  const openForgotPassword = () => {
+    setError('');
+    setResetEmail(email);
+    setResetOtp('');
+    setResetStep('email');
+    setForgotModalOpen(true);
+  };
+
+  const handleSendResetOtp = async () => {
+    const trimmedEmail = resetEmail.trim();
+    if (!trimmedEmail) {
       setError('Please enter your email to reset password');
       return;
     }
 
-    setLoading(true);
+    setResetLoading(true);
     setError('');
 
     try {
-      const result = await authService.resetPassword(email);
+      const result = await authService.resetPassword(trimmedEmail);
 
       if (result.success) {
-        alert('Password reset email sent! Check your inbox.');
+        setResetEmail(trimmedEmail);
+        setResetStep('otp');
         setError('');
       } else {
-        setError(result.error || 'Failed to send reset email');
+        setError(result.error || 'Failed to send reset code');
       }
     } catch (err: any) {
       console.error('Reset password error:', err);
-      setError(err.message || 'Failed to send reset email');
+      setError(err.message || 'Failed to send reset code');
     } finally {
-      setLoading(false);
+      setResetLoading(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async () => {
+    if (!resetOtp.trim()) {
+      setError('Please enter the OTP from your email');
+      return;
+    }
+
+    setResetLoading(true);
+    setError('');
+
+    try {
+      const result = await authService.verifyPasswordResetOtp(resetEmail, resetOtp);
+      if (result.success) {
+        setForgotModalOpen(false);
+        router.replace('/reset-password');
+      } else {
+        setError(result.error || 'Invalid or expired reset code');
+      }
+    } catch (err: any) {
+      console.error('Verify reset OTP error:', err);
+      setError(err.message || 'Failed to verify reset code');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -372,7 +411,7 @@ export default function LoginWeb() {
                 {/* Forgot password */}
                 <div style={{ textAlign: 'right', marginTop: '-10px', marginBottom: '0' }}>
                   <span
-                    onClick={handleForgotPassword}
+                    onClick={openForgotPassword}
                     style={{
                       fontSize: '14px',
                       color: colors.error,
@@ -499,6 +538,180 @@ export default function LoginWeb() {
           </div>
         </div>
       </div>
+      {forgotModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.48)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: windowWidth < 520 ? '16px' : '24px',
+            zIndex: 50,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(420px, 100%)',
+              border: `1px solid ${colors.border}`,
+              borderRadius: '16px',
+              backgroundColor: theme === 'dark' ? '#101543' : '#FFFFFF',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.28)',
+              padding: windowWidth < 520 ? '22px' : '28px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+                marginBottom: '8px',
+              }}
+            >
+              <h2
+                id="reset-password-title"
+                style={{
+                  margin: 0,
+                  color: colors.text,
+                  fontSize: '24px',
+                  fontWeight: 700,
+                }}
+              >
+                Reset password
+              </h2>
+              <button
+                type="button"
+                onClick={() => setForgotModalOpen(false)}
+                disabled={resetLoading}
+                aria-label="Close reset password dialog"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  border: `1px solid ${colors.border}`,
+                  background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#FFFFFF',
+                  color: colors.text,
+                  cursor: resetLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </button>
+            </div>
+
+            <p
+              style={{
+                margin: '0 0 24px',
+                color: colors.secondaryText,
+                fontSize: '14px',
+                lineHeight: 1.5,
+              }}
+            >
+              {resetStep === 'email'
+                ? 'Enter the email linked to your account.'
+                : 'Enter the OTP sent to your email.'}
+            </p>
+
+            <div style={{ position: 'relative', width: '100%', marginBottom: '20px' }}>
+              <label
+                style={{
+                  position: 'absolute',
+                  top: '0',
+                  left: '16px',
+                  backgroundColor: theme === 'dark' ? '#101543' : '#FFFFFF',
+                  padding: '0 6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: colors.text,
+                  transform: 'translateY(-50%)',
+                  lineHeight: '1',
+                }}
+              >
+                {resetStep === 'email' ? 'Email address' : 'OTP'}
+              </label>
+              <input
+                type={resetStep === 'email' ? 'email' : 'text'}
+                inputMode={resetStep === 'email' ? 'email' : 'numeric'}
+                placeholder={resetStep === 'email' ? 'e.g. wilson09@gmail.com' : 'Enter OTP'}
+                value={resetStep === 'email' ? resetEmail : resetOtp}
+                onChange={(e) =>
+                  resetStep === 'email' ? setResetEmail(e.target.value) : setResetOtp(e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !resetLoading) {
+                    if (resetStep === 'email') {
+                      handleSendResetOtp();
+                    } else {
+                      handleVerifyResetOtp();
+                    }
+                  }
+                }}
+                disabled={resetLoading}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '10px',
+                  fontSize: '16px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : '#FFFFFF',
+                  color: colors.text,
+                }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={resetStep === 'email' ? handleSendResetOtp : handleVerifyResetOtp}
+              disabled={resetLoading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '50px',
+                backgroundColor: resetLoading ? colors.secondaryText : colors.buttonPrimary,
+                color: colors.buttonText,
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '16px',
+                cursor: resetLoading ? 'not-allowed' : 'pointer',
+                opacity: resetLoading ? 0.7 : 1,
+              }}
+            >
+              {resetLoading ? 'Please wait...' : resetStep === 'email' ? 'Send OTP' : 'Verify OTP'}
+            </button>
+
+            {resetStep === 'otp' && (
+              <button
+                type="button"
+                onClick={handleSendResetOtp}
+                disabled={resetLoading}
+                style={{
+                  width: '100%',
+                  marginTop: '16px',
+                  border: 'none',
+                  background: 'none',
+                  color: colors.primary,
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: resetLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Resend OTP
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

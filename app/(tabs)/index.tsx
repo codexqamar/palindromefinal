@@ -9,6 +9,7 @@ import {
     Alert,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     StyleSheet,
     Text,
@@ -29,6 +30,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetStep, setResetStep] = useState<'email' | 'otp'>('email');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -53,24 +59,56 @@ export default function LoginScreen() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      Alert.alert('Reset Password', 'Please enter your email address first.');
+  const openForgotPassword = () => {
+    setResetEmail(email);
+    setResetOtp('');
+    setResetStep('email');
+    setForgotModalVisible(true);
+  };
+
+  const handleSendResetOtp = async () => {
+    const trimmedEmail = resetEmail.trim();
+    if (!trimmedEmail) {
+      Alert.alert('Reset Password', 'Please enter your email address.');
       return;
     }
 
-    setLoading(true);
+    setResetLoading(true);
     try {
-      const result = await authService.resetPassword(email);
+      const result = await authService.resetPassword(trimmedEmail);
       if (result.success) {
-        Alert.alert('Success', 'Password reset email sent! Check your inbox.');
+        setResetEmail(trimmedEmail);
+        setResetStep('otp');
+        Alert.alert('Check your email', 'Enter the OTP from your recovery email.');
       } else {
-        Alert.alert('Error', result.error || 'Failed to send reset email');
+        Alert.alert('Error', result.error || 'Failed to send reset code');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'An unexpected error occurred');
     } finally {
-      setLoading(false);
+      setResetLoading(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async () => {
+    if (!resetOtp.trim()) {
+      Alert.alert('Reset Password', 'Please enter the OTP from your email.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const result = await authService.verifyPasswordResetOtp(resetEmail, resetOtp);
+      if (result.success) {
+        setForgotModalVisible(false);
+        router.replace('/reset-password');
+      } else {
+        Alert.alert('Error', result.error || 'Invalid or expired reset code');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to verify reset code');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -241,7 +279,7 @@ export default function LoginScreen() {
 
                 <TouchableOpacity
                   style={styles.forgotWrapper}
-                  onPress={handleForgotPassword}
+                  onPress={openForgotPassword}
                   disabled={loading}
                 >
                   <Text
@@ -353,6 +391,114 @@ export default function LoginScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={forgotModalVisible}
+        onRequestClose={() => !resetLoading && setForgotModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKeyboard}
+          >
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: isDark ? '#101543' : '#FFFFFF',
+                  borderColor: isDark ? 'rgba(255,255,255,0.18)' : '#E5E7EB',
+                },
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+                  Reset password
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setForgotModalVisible(false)}
+                  disabled={resetLoading}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={22} color={isDark ? '#FFFFFF' : '#111111'} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.modalCopy, { color: isDark ? '#DADADA' : '#49463F' }]}>
+                {resetStep === 'email'
+                  ? 'Enter the email linked to your account.'
+                  : 'Enter the OTP sent to your email.'}
+              </Text>
+
+              <View style={styles.inputGroup}>
+                <View style={styles.floatingLabelWrapper}>
+                  <Text
+                    style={[
+                      styles.floatingLabel,
+                      {
+                        backgroundColor: isDark ? '#101543' : '#FFFFFF',
+                        color: isDark ? '#FFFFFF' : '#000000',
+                      },
+                    ]}
+                  >
+                    {resetStep === 'email' ? 'Email address' : 'OTP'}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF',
+                        color: isDark ? '#FFFFFF' : '#000000',
+                        borderColor: isDark ? '#2A2D50' : '#EFE8E8',
+                      },
+                    ]}
+                    placeholder={resetStep === 'email' ? 'e.g. wilson09@gmail.com' : 'Enter OTP'}
+                    placeholderTextColor={isDark ? '#CCC' : '#555'}
+                    keyboardType={resetStep === 'email' ? 'email-address' : 'number-pad'}
+                    autoCapitalize="none"
+                    value={resetStep === 'email' ? resetEmail : resetOtp}
+                    onChangeText={resetStep === 'email' ? setResetEmail : setResetOtp}
+                    editable={!resetLoading}
+                    returnKeyType="done"
+                    onSubmitEditing={resetStep === 'email' ? handleSendResetOtp : handleVerifyResetOtp}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.loginButton,
+                  styles.modalPrimaryButton,
+                  { backgroundColor: isDark ? '#375FFF' : '#007BFF' },
+                  resetLoading && { opacity: 0.7 },
+                ]}
+                onPress={resetStep === 'email' ? handleSendResetOtp : handleVerifyResetOtp}
+                disabled={resetLoading}
+              >
+                {resetLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.loginButtonText}>
+                    {resetStep === 'email' ? 'Send OTP' : 'Verify OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {resetStep === 'otp' ? (
+                <TouchableOpacity
+                  onPress={handleSendResetOtp}
+                  disabled={resetLoading}
+                  style={styles.resendButton}
+                >
+                  <Text style={[styles.forgotPassword, { color: isDark ? '#AAB3FF' : '#007BFF' }]}>
+                    Resend OTP
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -474,5 +620,47 @@ const styles = StyleSheet.create({
   },
   footerBold: {
     fontFamily: 'Geist-Bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalKeyboard: {
+    width: '100%',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 22,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontFamily: 'Geist-Bold',
+    fontSize: 22,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalCopy: {
+    fontFamily: 'Geist-Regular',
+    fontSize: 14,
+    marginBottom: 24,
+  },
+  modalPrimaryButton: {
+    marginBottom: 0,
+  },
+  resendButton: {
+    alignItems: 'center',
+    paddingTop: 16,
   },
 });
