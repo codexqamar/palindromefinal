@@ -320,12 +320,44 @@ class AuthService {
     }
   }
 
+  private async getInvalidCredentialsError(email: string): Promise<AuthResult> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('email', email)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: 'invalid_credentials', code: 'invalid_credentials' };
+      }
+
+      const code = data ? 'wrong_password' : 'wrong_email';
+      return { success: false, error: code, code };
+    } catch {
+      return { success: false, error: 'invalid_credentials', code: 'invalid_credentials' };
+    }
+  }
+
   async signIn(email: string, password: string): Promise<AuthResult> {
     try {
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const normalizedEmail = email.trim();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
 
-      if (error) return { success: false, error: error.message, code: (error as any).code };
+      if (error) {
+        const code = (error as any).code;
+        if (code === 'invalid_credentials' || error.message === 'Invalid login credentials') {
+          return await this.getInvalidCredentialsError(normalizedEmail);
+        }
+
+        return { success: false, error: error.message, code };
+      }
       return { success: true, user: data.user ? toAuthUser(data.user) : null };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Failed to sign in' };
